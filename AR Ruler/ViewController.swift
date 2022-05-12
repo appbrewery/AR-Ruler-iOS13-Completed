@@ -25,6 +25,8 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         
         sceneView.debugOptions = [ARSCNDebugOptions.showFeaturePoints]
         
+        sceneView.autoenablesDefaultLighting = true
+        
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -32,6 +34,8 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         
         // Create a session configuration
         let configuration = ARWorldTrackingConfiguration()
+        
+        configuration.planeDetection = .horizontal
         
         // Run the view's session
         sceneView.session.run(configuration)
@@ -50,21 +54,25 @@ class ViewController: UIViewController, ARSCNViewDelegate {
             for dot in dotNodes {
                 dot.removeFromParentNode()
             }
+            
+            textNode.removeFromParentNode()
+            
             dotNodes = [SCNNode]()
         }
         
-        if let touchLocation = touches.first?.location(in: sceneView) {
-            let hitTestResults = sceneView.hitTest(touchLocation, types: .featurePoint)
-            
-            if let hitResult = hitTestResults.first {
-                addDot(at: hitResult)
-            }
-            
-        }
+        guard let touchLocation = touches.first?.location(in: sceneView) else {return}
+        
+        guard let query = sceneView.raycastQuery(from: touchLocation, allowing: .existingPlaneGeometry, alignment: .any) else {return}
+        
+        guard let hitResults = sceneView.session.raycast(query).first else {return}
+        
+        addDot(atLocation: hitResults)
     }
     
-    func addDot(at hitResult : ARHitTestResult) {
+    func addDot(atLocation hitResult : ARRaycastResult) {
+        
         let dotGeometry = SCNSphere(radius: 0.005)
+        
         let material = SCNMaterial()
         material.diffuse.contents = UIColor.red
         
@@ -94,17 +102,15 @@ class ViewController: UIViewController, ARSCNViewDelegate {
             pow(end.position.x - start.position.x, 2) +
             pow(end.position.y - start.position.y, 2) +
             pow(end.position.z - start.position.z, 2)
-        )
+        ) * 100
         
-        updateText(text: "\(abs(distance))", atPosition: end.position)
+         updateText(text:String(format: "%.2f cm", distance), atPosition: end.position)
         
 //        distance = √ ((x2-x1)^2 + (y2-y1)^2 + (z2-z1)^2)
         
     }
     
     func updateText(text: String, atPosition position: SCNVector3){
-        
-        textNode.removeFromParentNode()
         
         let textGeometry = SCNText(string: text, extrusionDepth: 1.0)
         
@@ -117,10 +123,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         textNode.scale = SCNVector3(0.01, 0.01, 0.01)
         
         sceneView.scene.rootNode.addChildNode(textNode)
-        
     }
-    
-    
 }
 
 
